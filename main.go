@@ -12,6 +12,7 @@ const (
 	screenHeight = 420
 	boardSize    = 10
 	tileSize     = 42
+	tileGap      = 2
 )
 
 var (
@@ -66,11 +67,27 @@ func createBoard(size int) *Board {
 	}
 }
 
+func (t *Tile) click(x, y int) {
+	tileX := x / tileSize
+	tileY := y / tileSize
+
+	if t.x == tileX && t.y == tileY {
+		t.on = true
+		t.image.Fill(white)
+	}
+}
+
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
 	return 210, 210
 }
 
 func (g *Game) Update() error {
+	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
+		x, y := ebiten.CursorPosition()
+		for tile := range g.board.tiles {
+			tile.click(x, y)
+		}
+	}
 	return nil
 }
 
@@ -79,8 +96,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	for tile := range g.board.tiles {
 		op := &ebiten.DrawImageOptions{}
-
-		op.GeoM.Translate(float64(tileSize*tile.x), float64(tileSize*tile.y))
+		op.GeoM.Translate(float64(tileSize*tile.x+tileGap*tile.x), float64(tileSize*tile.y+tileGap*tile.y))
 		screen.DrawImage(tile.image, op)
 	}
 }
