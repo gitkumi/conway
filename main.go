@@ -8,11 +8,9 @@ import (
 )
 
 const (
-	screenWidth  = 420
-	screenHeight = 420
-	boardSize    = 10
-	tileSize     = 42
-	tileGap      = 2
+	screenWidth  = 600
+	screenHeight = 600
+	boardSize    = 120
 )
 
 var (
@@ -37,7 +35,7 @@ type Game struct {
 	board *Board
 }
 
-func createTile(x, y int) *Tile {
+func createTile(x, y int, tileSize int) *Tile {
 	image := ebiten.NewImage(tileSize, tileSize)
 	image.Fill(black)
 
@@ -49,13 +47,14 @@ func createTile(x, y int) *Tile {
 	}
 }
 
-func createBoard(size int) *Board {
+func createBoard(size int, screenWidth, screenHeight int) *Board {
+	tileSize := screenWidth / size
 	image := ebiten.NewImage(screenWidth, screenHeight)
 	tiles := make(map[*Tile]struct{})
 
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			tile := createTile(x, y)
+			tile := createTile(x, y, tileSize)
 			tiles[tile] = struct{}{}
 		}
 	}
@@ -68,8 +67,8 @@ func createBoard(size int) *Board {
 }
 
 func (t *Tile) click(x, y int) {
-	tileX := x / tileSize
-	tileY := y / tileSize
+	tileX := x / t.image.Bounds().Dx()
+	tileY := y / t.image.Bounds().Dy()
 
 	if t.x == tileX && t.y == tileY {
 		t.on = true
@@ -78,7 +77,7 @@ func (t *Tile) click(x, y int) {
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
-	return 210, 210
+	return 300, 300
 }
 
 func (g *Game) Update() error {
@@ -94,21 +93,24 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.DrawImage(g.board.image, nil)
 
+	tileSize := g.board.image.Bounds().Dx() / g.board.size
+
 	for tile := range g.board.tiles {
 		op := &ebiten.DrawImageOptions{}
-		op.GeoM.Translate(float64(tileSize*tile.x+tileGap*tile.x), float64(tileSize*tile.y+tileGap*tile.y))
+		op.GeoM.Translate(float64(tileSize*tile.x), float64(tileSize*tile.y))
 		screen.DrawImage(tile.image, op)
 	}
 }
 
 func main() {
-	ebiten.SetWindowSize(screenWidth, screenHeight)
-	ebiten.SetWindowTitle("Tiles")
-	board := createBoard(boardSize)
+	board := createBoard(boardSize, screenWidth, screenHeight)
 
 	g := &Game{
 		board: board,
 	}
+
+	ebiten.SetWindowSize(screenWidth, screenHeight)
+	ebiten.SetWindowTitle("John Conway's Game of Life")
 
 	if err := ebiten.RunGame(g); err != nil {
 		log.Fatal(err)
