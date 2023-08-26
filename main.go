@@ -28,7 +28,7 @@ var (
 
 type Cell struct {
 	live       bool
-	immune     bool
+	immunity   int
 	currentAge int
 	x          int
 	y          int
@@ -88,18 +88,18 @@ func createGrid(size int, screenWidth, screenHeight int) *Grid {
 
 func (c *Cell) kill() {
 	c.live = false
-	c.immune = false
+	c.immunity = 0
 	c.currentAge = 0
 	c.image.Fill(white)
 }
 
-func (c *Cell) spawn(cells []*Cell, immune bool) {
+func (c *Cell) spawn(cells []*Cell, immunity int) {
 	c.live = true
-	c.immune = immune
+	c.immunity = immunity
 
-	if c.immune {
+	if c.immunity > 0 {
 		liveNeighborsCount := c.countLiveNeighbors(cells)
-		color := ternary(liveNeighborsCount > 2, gray1, white)
+		color := ternary(liveNeighborsCount > 2, red, white)
 		c.image.Fill(color)
 	} else {
 		c.image.Fill(gray1)
@@ -109,10 +109,7 @@ func (c *Cell) spawn(cells []*Cell, immune bool) {
 func (c *Cell) age() {
 	c.currentAge++
 
-	if c.immune && c.currentAge > 10 {
-		c.immune = false
-		c.image.Fill(gray5)
-	} else {
+	if c.immunity <= 0 {
 		if c.currentAge <= 2 {
 			c.image.Fill(gray2)
 		} else if c.currentAge <= 4 {
@@ -120,6 +117,12 @@ func (c *Cell) age() {
 		} else if c.currentAge <= 6 {
 			c.image.Fill(gray4)
 		} else if c.currentAge <= 8 {
+			c.image.Fill(gray5)
+		}
+	} else {
+		c.immunity--
+
+		if c.currentAge > 10 {
 			c.image.Fill(gray5)
 		}
 	}
@@ -172,12 +175,12 @@ func (g *Game) tick() {
 				g.oldestCell,
 			)
 
-			if !nextCell.immune && (liveNeighborsCount < 2 || liveNeighborsCount > 3) {
+			if nextCell.immunity <= 0 && (liveNeighborsCount < 2 || liveNeighborsCount > 3) {
 				nextCell.kill()
 			}
 		} else {
 			if liveNeighborsCount == 3 {
-				nextCell.spawn(g.grid.cells, false)
+				nextCell.spawn(g.grid.cells, 0)
 			}
 		}
 
@@ -198,9 +201,10 @@ func (g *Game) spawnCells() {
 
 	for _, dc := range deadCells {
 		r := rand.Intn(100) + 1
+		immunity := rand.Intn(15) + 3
 
 		if r <= 1 {
-			dc.spawn(g.grid.cells, true)
+			dc.spawn(g.grid.cells, immunity)
 		}
 	}
 }
