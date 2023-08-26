@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	screenWidth  = 500
-	screenHeight = 500
+	screenWidth  = 600
+	screenHeight = 600
 	gridSize     = 120
 )
 
@@ -19,11 +19,18 @@ var (
 	black = color.RGBA{R: 0, G: 0, B: 0, A: 255}
 	white = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 	red   = color.RGBA{R: 255, G: 0, B: 0, A: 255}
-	gray1 = color.RGBA{0xE5, 0xE7, 0xEB, 0xFF}
-	gray2 = color.RGBA{0x9C, 0xA3, 0xAF, 0xFF}
-	gray3 = color.RGBA{0x4B, 0x55, 0x63, 0xFF}
-	gray4 = color.RGBA{0x1F, 0x29, 0x37, 0xFF}
-	gray5 = color.RGBA{0x03, 0x07, 0x12, 0xFF}
+
+	gray50  = color.RGBA{0xf9, 0xfa, 0xfb, 0xff}
+	gray100 = color.RGBA{0xf3, 0xf4, 0xf6, 0xff}
+	gray200 = color.RGBA{0xe5, 0xe7, 0xeb, 0xff}
+	gray300 = color.RGBA{0xd1, 0xd5, 0xdb, 0xff}
+	gray400 = color.RGBA{0x9c, 0xa3, 0xaf, 0xff}
+	gray500 = color.RGBA{0x6b, 0x72, 0x80, 0xff}
+	gray600 = color.RGBA{0x4b, 0x55, 0x63, 0xff}
+	gray700 = color.RGBA{0x37, 0x41, 0x51, 0xff}
+	gray800 = color.RGBA{0x1f, 0x29, 0x37, 0xff}
+	gray900 = color.RGBA{0x11, 0x18, 0x27, 0xff}
+	gray950 = color.RGBA{0x03, 0x07, 0x12, 0xff}
 )
 
 type Cell struct {
@@ -99,32 +106,37 @@ func (c *Cell) spawn(cells []*Cell, immunity int) {
 
 	if c.immunity > 0 {
 		liveNeighborsCount := c.countLiveNeighbors(cells)
-		color := ternary(liveNeighborsCount > 2, red, white)
+		color := ternary(liveNeighborsCount > 2, gray200, white)
 		c.image.Fill(color)
 	} else {
-		c.image.Fill(gray1)
+		c.image.Fill(gray200)
 	}
 }
 
 func (c *Cell) age() {
 	c.currentAge++
 
-	if c.immunity <= 0 {
-		if c.currentAge <= 2 {
-			c.image.Fill(gray2)
-		} else if c.currentAge <= 4 {
-			c.image.Fill(gray3)
-		} else if c.currentAge <= 6 {
-			c.image.Fill(gray4)
-		} else if c.currentAge <= 8 {
-			c.image.Fill(gray5)
-		}
-	} else {
+	if c.immunity > 0 {
 		c.immunity--
+		return
+	}
 
-		if c.currentAge > 10 {
-			c.image.Fill(gray5)
-		}
+	if c.currentAge == 1 {
+		c.image.Fill(gray400)
+	} else if c.currentAge == 2 {
+		c.image.Fill(gray500)
+	} else if c.currentAge == 3 {
+		c.image.Fill(gray600)
+	} else if c.currentAge == 4 {
+		c.image.Fill(gray700)
+	} else if c.currentAge == 5 {
+		c.image.Fill(gray800)
+	} else if c.currentAge == 6 {
+		c.image.Fill(gray300)
+	} else if c.currentAge == 7 {
+		c.image.Fill(gray200)
+	} else if c.currentAge == 8 {
+		c.image.Fill(gray100)
 	}
 }
 
@@ -201,7 +213,7 @@ func (g *Game) spawnCells() {
 
 	for _, dc := range deadCells {
 		r := rand.Intn(100) + 1
-		immunity := rand.Intn(15) + 3
+		immunity := rand.Intn(8)
 
 		if r <= 1 {
 			dc.spawn(g.grid.cells, immunity)
@@ -210,7 +222,7 @@ func (g *Game) spawnCells() {
 }
 
 func (g *Game) Update() error {
-	chance := rand.Intn(10) + 5
+	chance := rand.Intn(5) + 3
 
 	if g.grid.generation%chance == 0 {
 		g.spawnCells()
