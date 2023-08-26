@@ -10,16 +10,20 @@ import (
 )
 
 const (
-	screenWidth  = 500
-	screenHeight = 500
+	screenWidth  = 800
+	screenHeight = 600
 	gridSize     = 100
 )
 
 var (
 	black = color.RGBA{R: 0, G: 0, B: 0, A: 255}
-	red   = color.RGBA{255, 0, 0, 255}
-	green = color.RGBA{0, 255, 0, 255}
 	white = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	red   = color.RGBA{R: 255, G: 0, B: 0, A: 255}
+	gray1 = color.RGBA{0xE5, 0xE7, 0xEB, 0xFF}
+	gray2 = color.RGBA{0x9C, 0xA3, 0xAF, 0xFF}
+	gray3 = color.RGBA{0x4B, 0x55, 0x63, 0xFF}
+	gray4 = color.RGBA{0x1F, 0x29, 0x37, 0xFF}
+	gray5 = color.RGBA{0x03, 0x07, 0x12, 0xFF}
 )
 
 type Cell struct {
@@ -39,17 +43,17 @@ type Grid struct {
 }
 
 type Game struct {
-	grid *Grid
+	grid       *Grid
+	oldestCell int
 }
 
-func createCell(generation, x, y int, cellSize int) *Cell {
-	image := ebiten.NewImage(cellSize, cellSize)
-	image.Fill(white)
+func createCell(generation, x, y int, image *ebiten.Image) *Cell {
+	newImage := ebiten.NewImageFromImage(image)
 
 	return &Cell{
 		live:       false,
 		currentAge: 0,
-		image:      image,
+		image:      newImage,
 		x:          x,
 		y:          y,
 	}
@@ -57,20 +61,24 @@ func createCell(generation, x, y int, cellSize int) *Cell {
 
 func createGrid(size int, screenWidth, screenHeight int) *Grid {
 	cellSize := screenWidth / size
-	image := ebiten.NewImage(screenWidth, screenHeight)
 	var cells []*Cell
+
+	cellImage := ebiten.NewImage(cellSize, cellSize)
+	cellImage.Fill(white)
 
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			cell := createCell(0, x, y, cellSize)
+			cell := createCell(0, x, y, cellImage)
 			cells = append(cells, cell)
 		}
 	}
 
+	gridImage := ebiten.NewImage(screenWidth, screenHeight)
+
 	return &Grid{
 		size:       size,
 		cells:      cells,
-		image:      image,
+		image:      gridImage,
 		generation: 0,
 	}
 }
@@ -88,14 +96,10 @@ func (c *Cell) spawn(cells []*Cell, immune bool) {
 
 	if c.immune {
 		liveNeighborsCount := c.getLiveNeighborsCount(cells)
-
-		if liveNeighborsCount > 2 {
-			c.image.Fill(red)
-		} else {
-			c.image.Fill(white)
-		}
+		color := ternary(liveNeighborsCount > 2, gray1, white)
+		c.image.Fill(color)
 	} else {
-		c.image.Fill(black)
+		c.image.Fill(gray1)
 	}
 }
 
@@ -104,7 +108,17 @@ func (c *Cell) age() {
 
 	if c.immune && c.currentAge > 10 {
 		c.immune = false
-		c.image.Fill(black)
+		c.image.Fill(gray5)
+	} else {
+		if c.currentAge <= 2 {
+			c.image.Fill(gray2)
+		} else if c.currentAge <= 4 {
+			c.image.Fill(gray3)
+		} else if c.currentAge <= 6 {
+			c.image.Fill(gray4)
+		} else if c.currentAge <= 8 {
+			c.image.Fill(gray5)
+		}
 	}
 }
 
@@ -145,6 +159,12 @@ func (g *Game) tick() {
 
 		if nextCell.live {
 			nextCell.age()
+
+			g.oldestCell = ternary(
+				nextCell.currentAge > g.oldestCell,
+				nextCell.currentAge,
+				g.oldestCell,
+			)
 
 			if !nextCell.immune && (liveNeighborsCount < 2 || liveNeighborsCount > 3) {
 				nextCell.kill()
@@ -189,6 +209,7 @@ func (g *Game) Update() error {
 	g.tick()
 
 	fmt.Println("Generation: ", g.grid.generation)
+	fmt.Println("Oldest: ", g.oldestCell)
 	g.grid.generation++
 
 	return nil
@@ -222,4 +243,12 @@ func main() {
 	if err := ebiten.RunGame(g); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func ternary[T any](cond bool, left, right T) T {
+	if cond {
+		return left
+	}
+
+	return right
 }
