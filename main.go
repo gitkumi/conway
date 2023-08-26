@@ -17,14 +17,18 @@ const (
 
 var (
 	black = color.RGBA{R: 0, G: 0, B: 0, A: 255}
+	red   = color.RGBA{255, 0, 0, 255}
+	green = color.RGBA{0, 255, 0, 255}
 	white = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 )
 
 type Cell struct {
-	live  bool
-	x     int
-	y     int
-	image *ebiten.Image
+	live       bool
+	immune     bool
+	currentAge int
+	x          int
+	y          int
+	image      *ebiten.Image
 }
 
 type Grid struct {
@@ -38,15 +42,16 @@ type Game struct {
 	grid *Grid
 }
 
-func createCell(x, y int, cellSize int) *Cell {
+func createCell(generation, x, y int, cellSize int) *Cell {
 	image := ebiten.NewImage(cellSize, cellSize)
 	image.Fill(white)
 
 	return &Cell{
-		live:  false,
-		image: image,
-		x:     x,
-		y:     y,
+		live:       false,
+		currentAge: 0,
+		image:      image,
+		x:          x,
+		y:          y,
 	}
 }
 
@@ -57,7 +62,7 @@ func createGrid(size int, screenWidth, screenHeight int) *Grid {
 
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			cell := createCell(x, y, cellSize)
+			cell := createCell(0, x, y, cellSize)
 			cells = append(cells, cell)
 		}
 	}
@@ -70,26 +75,30 @@ func createGrid(size int, screenWidth, screenHeight int) *Grid {
 	}
 }
 
-func (t *Cell) toggle() {
-	t.live = !t.live
+func (c *Cell) kill() {
+	c.live = false
+	c.immune = false
+	c.currentAge = 0
+	c.image.Fill(white)
+}
 
-	if t.live {
-		t.image.Fill(black)
+func (c *Cell) spawn(generation int, immune bool) {
+	c.live = true
+	c.immune = immune
+
+	if c.immune {
+		c.image.Fill(red)
 	} else {
-		t.image.Fill(white)
+		c.image.Fill(black)
 	}
 }
 
-func (g *Game) handleClick() {
-	x, y := ebiten.CursorPosition()
+func (c *Cell) age() {
+	c.currentAge++
 
-	for _, cell := range g.grid.cells {
-		cellY := y / cell.image.Bounds().Dy()
-		cellX := x / cell.image.Bounds().Dx()
-
-		if cell.x == cellX && cell.y == cellY {
-			cell.toggle()
-		}
+	if c.immune && c.currentAge > 10 {
+		c.immune = false
+		c.image.Fill(black)
 	}
 }
 
@@ -128,13 +137,15 @@ func (g *Game) tick() {
 		liveNeighborsCount := cell.getLiveNeighborsCount(g.grid.cells)
 		nextCell := *cell
 
-		if cell.live {
-			if liveNeighborsCount < 2 || liveNeighborsCount > 3 {
-				nextCell.toggle()
+		if nextCell.live {
+			nextCell.age()
+
+			if !nextCell.immune && (liveNeighborsCount < 2 || liveNeighborsCount > 3) {
+				nextCell.kill()
 			}
 		} else {
 			if liveNeighborsCount == 3 {
-				nextCell.toggle()
+				nextCell.spawn(g.grid.generation, false)
 			}
 		}
 
@@ -144,7 +155,7 @@ func (g *Game) tick() {
 	g.grid.cells = nextCells
 }
 
-func (g *Game) birth() {
+func (g *Game) spawnCells() {
 	var deadCells []*Cell
 
 	for _, c := range g.grid.cells {
@@ -153,20 +164,19 @@ func (g *Game) birth() {
 		}
 	}
 
-	deadRatio := len(deadCells) / len(g.grid.cells)
-
 	for _, dc := range deadCells {
-		rand := rand.Intn(100) + 1
+		r := rand.Intn(100) + 1
+		chance := rand.Intn(4) + 1
 
-		if rand <= 1+(5*deadRatio) {
-			dc.toggle()
+		if r <= chance {
+			dc.spawn(g.grid.generation, true)
 		}
 	}
 }
 
 func (g *Game) Update() error {
-	if g.grid.generation%2 == 0 {
-		g.birth()
+	if g.grid.generation%3 == 0 {
+		g.spawnCells()
 	}
 
 	g.tick()
