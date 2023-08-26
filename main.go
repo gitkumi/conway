@@ -82,12 +82,18 @@ func (c *Cell) kill() {
 	c.image.Fill(white)
 }
 
-func (c *Cell) spawn(generation int, immune bool) {
+func (c *Cell) spawn(cells []*Cell, immune bool) {
 	c.live = true
 	c.immune = immune
 
 	if c.immune {
-		c.image.Fill(red)
+		liveNeighborsCount := c.getLiveNeighborsCount(cells)
+
+		if liveNeighborsCount > 2 {
+			c.image.Fill(red)
+		} else {
+			c.image.Fill(white)
+		}
 	} else {
 		c.image.Fill(black)
 	}
@@ -145,7 +151,7 @@ func (g *Game) tick() {
 			}
 		} else {
 			if liveNeighborsCount == 3 {
-				nextCell.spawn(g.grid.generation, false)
+				nextCell.spawn(g.grid.cells, false)
 			}
 		}
 
@@ -166,16 +172,17 @@ func (g *Game) spawnCells() {
 
 	for _, dc := range deadCells {
 		r := rand.Intn(100) + 1
-		chance := rand.Intn(4) + 1
 
-		if r <= chance {
-			dc.spawn(g.grid.generation, true)
+		if r <= 1 {
+			dc.spawn(g.grid.cells, true)
 		}
 	}
 }
 
 func (g *Game) Update() error {
-	if g.grid.generation%3 == 0 {
+	chance := rand.Intn(10) + 5
+
+	if g.grid.generation%chance == 0 {
 		g.spawnCells()
 	}
 
