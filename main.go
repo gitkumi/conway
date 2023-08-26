@@ -103,9 +103,11 @@ func (c *Cell) getLiveNeighborsCount(cells []*Cell) int {
 			if r == row && c == col {
 				continue
 			}
-			if r >= 0 && r < gridSize && c >= 0 && c < gridSize {
-				neighbors = append(neighbors, cells[r*gridSize+c])
-			}
+
+			wrappedRow := (r + gridSize) % gridSize
+			wrappedCol := (c + gridSize) % gridSize
+
+			neighbors = append(neighbors, cells[wrappedRow*gridSize+wrappedCol])
 		}
 	}
 
@@ -162,36 +164,12 @@ func (g *Game) birth() {
 	}
 }
 
-func (g *Game) death() {
-	var aliveCells []*Cell
-
-	for _, c := range g.grid.cells {
-		if c.live {
-			aliveCells = append(aliveCells, c)
-		}
-	}
-
-	aliveRatio := len(aliveCells) / len(g.grid.cells)
-
-	for _, ac := range aliveCells {
-		rand := rand.Intn(100) + 1
-
-		if rand <= 1+(5*aliveRatio) {
-			ac.toggle()
-		}
-	}
-}
-
 func (g *Game) Update() error {
-	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
-		g.handleClick()
-	} else {
-		if g.grid.generation%3 == 0 {
-			g.birth()
-			g.death()
-		}
-		g.tick()
+	if g.grid.generation%2 == 0 {
+		g.birth()
 	}
+
+	g.tick()
 
 	fmt.Println("Generation: ", g.grid.generation)
 	g.grid.generation++
