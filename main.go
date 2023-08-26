@@ -10,9 +10,9 @@ import (
 )
 
 const (
-	screenWidth  = 800
-	screenHeight = 600
-	gridSize     = 100
+	screenWidth  = 500
+	screenHeight = 500
+	gridSize     = 120
 )
 
 var (
@@ -33,6 +33,7 @@ type Cell struct {
 	x          int
 	y          int
 	image      *ebiten.Image
+	neighbors  []int
 }
 
 type Grid struct {
@@ -73,12 +74,14 @@ func createGrid(size int, screenWidth, screenHeight int) *Grid {
 		}
 	}
 
-	gridImage := ebiten.NewImage(screenWidth, screenHeight)
+	for _, cell := range cells {
+		cell.initNeighbors(cells)
+	}
 
 	return &Grid{
 		size:       size,
 		cells:      cells,
-		image:      gridImage,
+		image:      ebiten.NewImage(screenWidth, screenHeight),
 		generation: 0,
 	}
 }
@@ -95,7 +98,7 @@ func (c *Cell) spawn(cells []*Cell, immune bool) {
 	c.immune = immune
 
 	if c.immune {
-		liveNeighborsCount := c.getLiveNeighborsCount(cells)
+		liveNeighborsCount := c.countLiveNeighbors(cells)
 		color := ternary(liveNeighborsCount > 2, gray1, white)
 		c.image.Fill(color)
 	} else {
@@ -122,26 +125,29 @@ func (c *Cell) age() {
 	}
 }
 
-func (c *Cell) getLiveNeighborsCount(cells []*Cell) int {
-	neighbors := make([]*Cell, 0, 8)
+func (c *Cell) initNeighbors(cells []*Cell) {
+	c.neighbors = make([]int, 0, 8)
 	row, col := c.y, c.x
 
-	for r := row - 1; r <= row+1; r++ {
-		for c := col - 1; c <= col+1; c++ {
+	for rowIndex := row - 1; rowIndex <= row+1; rowIndex++ {
+		for colIndex := col - 1; colIndex <= col+1; colIndex++ {
 			// Self
-			if r == row && c == col {
+			if rowIndex == row && colIndex == col {
 				continue
 			}
 
-			wrappedRow := (r + gridSize) % gridSize
-			wrappedCol := (c + gridSize) % gridSize
+			wrappedRow := (rowIndex + gridSize) % gridSize
+			wrappedCol := (colIndex + gridSize) % gridSize
 
-			neighbors = append(neighbors, cells[wrappedRow*gridSize+wrappedCol])
+			c.neighbors = append(c.neighbors, wrappedRow*gridSize+wrappedCol)
 		}
 	}
+}
 
+func (c *Cell) countLiveNeighbors(cells []*Cell) int {
 	alive := 0
-	for _, neighbor := range neighbors {
+	for _, index := range c.neighbors {
+		neighbor := cells[index]
 		if neighbor.live {
 			alive++
 		}
@@ -154,7 +160,7 @@ func (g *Game) tick() {
 	nextCells := make([]*Cell, len(g.grid.cells))
 
 	for i, cell := range g.grid.cells {
-		liveNeighborsCount := cell.getLiveNeighborsCount(g.grid.cells)
+		liveNeighborsCount := cell.countLiveNeighbors(g.grid.cells)
 		nextCell := *cell
 
 		if nextCell.live {
