@@ -4,19 +4,20 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 const (
-	screenWidth  = 600
-	screenHeight = 600
+	screenWidth  = 500
+	screenHeight = 500
 	gridSize     = 100
 )
 
 var (
-	black  = color.RGBA{R: 0, G: 0, B: 0, A: 255}
-	white  = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	black = color.RGBA{R: 0, G: 0, B: 0, A: 255}
+	white = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 )
 
 type Cell struct {
@@ -100,7 +101,7 @@ func (c *Cell) getLiveNeighborsCount(cells []*Cell) int {
 		for c := col - 1; c <= col+1; c++ {
 			// Self
 			if r == row && c == col {
-				continue 
+				continue
 			}
 			if r >= 0 && r < gridSize && c >= 0 && c < gridSize {
 				neighbors = append(neighbors, cells[r*gridSize+c])
@@ -141,10 +142,54 @@ func (g *Game) tick() {
 	g.grid.cells = nextCells
 }
 
+func (g *Game) birth() {
+	var deadCells []*Cell
+
+	for _, c := range g.grid.cells {
+		if !c.live {
+			deadCells = append(deadCells, c)
+		}
+	}
+
+	deadRatio := len(deadCells) / len(g.grid.cells)
+
+	for _, dc := range deadCells {
+		rand := rand.Intn(100) + 1
+
+		if rand <= 1+(5*deadRatio) {
+			dc.toggle()
+		}
+	}
+}
+
+func (g *Game) death() {
+	var aliveCells []*Cell
+
+	for _, c := range g.grid.cells {
+		if c.live {
+			aliveCells = append(aliveCells, c)
+		}
+	}
+
+	aliveRatio := len(aliveCells) / len(g.grid.cells)
+
+	for _, ac := range aliveCells {
+		rand := rand.Intn(100) + 1
+
+		if rand <= 1+(5*aliveRatio) {
+			ac.toggle()
+		}
+	}
+}
+
 func (g *Game) Update() error {
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		g.handleClick()
 	} else {
+		if g.grid.generation%3 == 0 {
+			g.birth()
+			g.death()
+		}
 		g.tick()
 	}
 
