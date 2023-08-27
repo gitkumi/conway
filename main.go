@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image/color"
 	"log"
 	"math/rand"
@@ -40,7 +39,8 @@ type Cell struct {
 	x          int
 	y          int
 	image      *ebiten.Image
-	neighbors  []int
+	// Index of neighbors
+	neighbors []int
 }
 
 type Grid struct {
@@ -51,46 +51,7 @@ type Grid struct {
 }
 
 type Game struct {
-	grid       *Grid
-	oldestCell int
-}
-
-func createCell(generation, x, y int, image *ebiten.Image) *Cell {
-	newImage := ebiten.NewImageFromImage(image)
-
-	return &Cell{
-		live:       false,
-		currentAge: 0,
-		image:      newImage,
-		x:          x,
-		y:          y,
-	}
-}
-
-func createGrid(size int, screenWidth, screenHeight int) *Grid {
-	cellSize := screenWidth / size
-	var cells []*Cell
-
-	cellImage := ebiten.NewImage(cellSize, cellSize)
-	cellImage.Fill(white)
-
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
-			cell := createCell(0, x, y, cellImage)
-			cells = append(cells, cell)
-		}
-	}
-
-	for _, cell := range cells {
-		cell.initNeighbors(cells)
-	}
-
-	return &Grid{
-		size:       size,
-		cells:      cells,
-		image:      ebiten.NewImage(screenWidth, screenHeight),
-		generation: 0,
-	}
+	grid *Grid
 }
 
 func (c *Cell) kill() {
@@ -100,13 +61,12 @@ func (c *Cell) kill() {
 	c.image.Fill(white)
 }
 
-func (c *Cell) spawn(cells []*Cell, immunity int) {
+func (c *Cell) spawn(liveNeighbors, immunity int) {
 	c.live = true
 	c.immunity = immunity
 
 	if c.immunity > 0 {
-		liveNeighborsCount := c.countLiveNeighbors(cells)
-		color := ternary(liveNeighborsCount > 2, gray200, white)
+		color := ternary(liveNeighbors > 2, gray200, white)
 		c.image.Fill(color)
 	} else {
 		c.image.Fill(gray200)
@@ -121,21 +81,26 @@ func (c *Cell) age() {
 		return
 	}
 
-	if c.currentAge == 1 {
+	switch c.currentAge {
+	case 1:
 		c.image.Fill(gray400)
-	} else if c.currentAge == 2 {
+	case 2:
 		c.image.Fill(gray500)
-	} else if c.currentAge == 3 {
+	case 3:
 		c.image.Fill(gray600)
-	} else if c.currentAge == 4 {
+	case 4:
 		c.image.Fill(gray700)
-	} else if c.currentAge == 5 {
+	case 5:
 		c.image.Fill(gray800)
-	} else if c.currentAge == 6 {
+	case 6:
 		c.image.Fill(gray300)
-	} else if c.currentAge == 7 {
+	case 7:
 		c.image.Fill(gray200)
-	} else if c.currentAge == 8 {
+	case 8:
+		c.image.Fill(gray100)
+	case 9:
+		c.image.Fill(gray50)
+	default:
 		c.image.Fill(gray100)
 	}
 }
@@ -171,31 +136,27 @@ func (c *Cell) countLiveNeighbors(cells []*Cell) int {
 	return alive
 }
 
+func (c *Cell) update(liveNeighbors int) {
+	if c.live {
+		c.age()
+
+		if c.immunity <= 0 && (liveNeighbors < 2 || liveNeighbors > 3) {
+			c.kill()
+		}
+	} else {
+		if liveNeighbors == 3 {
+			c.spawn(liveNeighbors, 0)
+		}
+	}
+}
+
 func (g *Game) tick() {
 	nextCells := make([]*Cell, len(g.grid.cells))
 
 	for i, cell := range g.grid.cells {
-		liveNeighborsCount := cell.countLiveNeighbors(g.grid.cells)
 		nextCell := *cell
-
-		if nextCell.live {
-			nextCell.age()
-
-			g.oldestCell = ternary(
-				nextCell.currentAge > g.oldestCell,
-				nextCell.currentAge,
-				g.oldestCell,
-			)
-
-			if nextCell.immunity <= 0 && (liveNeighborsCount < 2 || liveNeighborsCount > 3) {
-				nextCell.kill()
-			}
-		} else {
-			if liveNeighborsCount == 3 {
-				nextCell.spawn(g.grid.cells, 0)
-			}
-		}
-
+		liveNeighbors := nextCell.countLiveNeighbors(g.grid.cells)
+		nextCell.update(liveNeighbors)
 		nextCells[i] = &nextCell
 	}
 
@@ -216,7 +177,8 @@ func (g *Game) spawnCells() {
 		immunity := rand.Intn(8)
 
 		if r <= 1 {
-			dc.spawn(g.grid.cells, immunity)
+			liveNeighbors := dc.countLiveNeighbors(g.grid.cells)
+			dc.spawn(liveNeighbors, immunity)
 		}
 	}
 }
@@ -229,9 +191,6 @@ func (g *Game) Update() error {
 	}
 
 	g.tick()
-
-	fmt.Println("Generation: ", g.grid.generation)
-	fmt.Println("Oldest: ", g.oldestCell)
 	g.grid.generation++
 
 	return nil
@@ -264,6 +223,46 @@ func main() {
 
 	if err := ebiten.RunGame(g); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func createGrid(size int, screenWidth, screenHeight int) *Grid {
+	return &Grid{
+		generation: 0,
+		size:       size,
+		image:      ebiten.NewImage(screenWidth, screenHeight),
+		cells:      createCells(gridSize),
+	}
+}
+
+func createCells(size int) []*Cell {
+	cellSize := screenWidth / size
+	var cells []*Cell
+
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			cell := createCell(x, y, cellSize)
+			cells = append(cells, cell)
+		}
+	}
+
+	for _, cell := range cells {
+		cell.initNeighbors(cells)
+	}
+
+	return cells
+}
+
+func createCell(x, y, cellSize int) *Cell {
+	image := ebiten.NewImage(cellSize, cellSize)
+	image.Fill(white)
+
+	return &Cell{
+		live:       false,
+		currentAge: 0,
+		image:      image,
+		x:          x,
+		y:          y,
 	}
 }
 
